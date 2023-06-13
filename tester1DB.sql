@@ -400,10 +400,10 @@ SELECT * FROM USER_TABLES;
 
 SELECT TABLE_NAME, LOGGING FROM USER_TABLES;
 
---권한있는 사람이 누군지 알 수 있음
+--권한있는 사람을 알 수 있음
 SELECT * FROM ALL_TABLES;
 
---DBA의 테이블들
+--DBA 테이블의 권한있는 사람을 알 수 있음
 SELECT OWNER FROM DBA_TABLES;
 
 
