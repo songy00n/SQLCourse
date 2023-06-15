@@ -966,3 +966,193 @@ END;
 
 DELETE FROM EMP02 WHERE EMPNO = 1004;
 
+-- 프로시저 : pl/sql문을 계속 사용하기 위해서 함수로 만든 것 return이 없다
+-- 함수 : pl/sql문을 계속 사용하기 위해서 함수로 만든 것 return이 있다
+-- 트리거 : 이벤트로 처리
+-- 모든 사원을 삭제하는 프로시저 만들기
+drop table emp01;
+create table emp01
+as
+select * from emp;
+select * from emp01;
+-- 만들고 컴파일 실행기
+-- 프로시저 만들기
+create or replace procedure del_all
+is
+begin
+   delete from emp01;
+   commit;
+end;
+/
+execute del_all; -- 실행하기
+select * from emp01;
+-- 저장 프로시저 조회하기 , 데이터 딕셔너리
+select * from user_source;
+-- 한예슬 레코드만 삭제하기
+create or replace procedure
+    del_ename(  vename   emp01.ename%type    )
+is
+begin
+   delete from emp01 where ename like vename;
+   commit;
+end;
+/
+execute del_ename( '한예슬' );
+select * from emp01;
+execute del_ename( '오지호' );
+--프로시저를 만들 때 [mode]  in, out, inout 매개변수
+create or replace procedure sel_empno
+  (
+      vempno in emp.empno%type,
+      vename out emp.ename%type,
+      vsal out emp.sal%type,
+      vjob out emp.job%type
+  )
+is
+begin
+  select ename, sal, job into vename, vsal, vjob
+  from emp
+  where empno = vempno;
+end;
+/
+-- 바인드 변수 선언하기
+variable var_name varchar2(15);
+variable var_sal number;
+variable var_job varchar2(9);
+-- 프로시저를 실행하기
+execute sel_empno( 1001, :var_name, :var_sal,  :var_job );
+-- 바인드 변수값 출력하기
+print var_name;
+print var_sal;
+print var_job;
+-- 함수
+-- 요구사항은 특별 보너스를 지급하는 저장함수 만들기
+create or replace function cal_bonus
+   (
+      vempno in emp.empno%type
+    )
+    return number
+is
+   vsal number(7,2);
+begin
+  select sal into vsal
+  from emp
+  where empno= vempno;
+  return (vsal * 200 );
+end;
+/
+-- 함수를 실행하려면 바인드 변수 선언해주고
+-- 실행한 것을 변수에 담는다
+variable var_res number;
+execute  :var_res := cal_bonus( 1003 );
+print var_res;
+select sal, cal_bonus( 1003 ), empno from emp where empno=1003;
+
+
+정현희
+  오후 2:56
+-- 커서
+-- begin안에 결과가 여러개 행이 나오면 반복문과 커서를 사용해야 한다.
+-- 방법1)
+-- 방법2)
+-- 커서를 사용하여 부서 테이블의 모든 내용을 출력하는 저장 프로시저 만들기
+select * from dept;
+-- 방법1)
+create or replace procedure cursor_sample01
+is
+    vdept dept%rowtype;
+    cursor c1
+    is
+    select * from dept;
+begin
+    dbms_output.put_line('부서번호     부서명      지역명 ');
+    dbms_output.put_line('-----------------------------');
+    open c1;
+    loop
+       fetch  c1 into vdept.deptno, vdept.dname, vdept.loc;
+       exit  when  c1%notfound;
+       dbms_output.put_line( vdept.deptno || '       ' || vdept.dname || '       ' || vdept.loc );
+    end loop;
+    close c1;
+end;
+/
+execute cursor_sample01;
+-- 방법2) for  레코드명 in 커서명 loop
+--             문장들1
+--             문장들2
+--        end loop;
+create or replace procedure cursor_sample02
+is
+    vdept dept%rowtype;
+    cursor c1
+    is
+    select * from dept;
+begin
+    dbms_output.put_line('부서번호     부서명      지역명 ');
+    dbms_output.put_line('-----------------------------');
+    for   vdept  in  c1  loop
+        exit when c1%notfound;
+        dbms_output.put_line( vdept.deptno || '       ' || vdept.dname || '       ' || vdept.loc );
+    end loop;
+end;
+/
+execute cursor_sample02;
+새 항목
+2:56
+-- 트리거
+drop table emp02;
+create table emp02(
+    empno number(4) primary key,
+    ename varchar2(20),
+    job varchar2(20)
+);
+select * from emp02;
+-- 삽입된 후 신입사원이 입사했습니다 출력되게
+create or replace trigger trg_01
+after insert
+on emp02
+begin
+   dbms_output.put_line('신입사원이 입사했습니다');
+end;
+/
+insert into emp02 values( 1001, '김사랑','사원');
+insert into emp02 values( 1002, '한예슬','사원');
+select * from emp02;
+-- 급여 정보를 자동으로 추가하는 트리거 작성하기
+drop table sal01;
+create table sal01
+  ( salno number(4) primary key,
+    sal number(7,2),
+    empno number(4) references emp02( empno ) );
+-- 사원테이블에 신입사원 입력되면 급여테이블 자동으로 입력되기
+-- 참고 자동으로 번호 붙이는 것  salno 자동 생성 시퀀스 만들기
+create sequence sal01_salno_seq;
+-- 1단계 트리거를 정의한다
+create or replace trigger trg_02
+ after  insert -- 삽입 후에
+ on emp02  -- 적용 테이블
+ for each row -- 한행씩 트리거 계속 발생
+begin
+  insert into sal01 values(  sal01_salno_seq.nextval, 300, :new.empno  );
+end;
+/
+-- 실행은 emp02에다 삽입하기
+insert into emp02 values ( 1003, '홍길동', '대리');
+insert into emp02 values ( 1004, '이순신', '사원');
+select * from emp02;
+select * from sal01;
+-- 급여 정보를 자동삭제하는 트리거 작성하기
+delete from emp02 where empno=1003; -- 외래키 관계로 인하여 오류가 남
+-- 트리거
+create or replace trigger trg_03
+  before delete
+  on emp02
+  for each row
+begin
+   delete from sal01 where empno = :old.empno;
+end;
+/
+delete from emp02 where empno=1004;
+select * from emp02;
+select * from sal01;
+
